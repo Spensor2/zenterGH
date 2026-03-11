@@ -1,0 +1,75 @@
+type User @table {
+  displayName: String!
+  phoneNumber: String!
+  createdAt: Timestamp!
+  email: String
+  photoUrl: String
+  userType: String
+  rating: Float
+  vehicleDetails: String
+}
+
+type Address @table {
+  user: User!
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  createdAt: Timestamp!
+  apartmentNumber: String
+  name: String
+}
+
+type RideRequest @table {
+  customer: User!
+  driver: User
+  pickupLocation: Address!
+  dropoffLocation: Address!
+  status: String!
+  requestedAt: Timestamp!
+  acceptedAt: Timestamp
+  completedAt: Timestamp
+  cancelledAt: Timestamp
+  driverRating: Int
+  customerRating: Int
+  fare: Float
+  paymentStatus: String
+}
+
+type Restaurant @table {
+  name: String!
+  address: Address!
+  cuisineType: String!
+  createdAt: Timestamp!
+  phoneNumber: String
+  website: String
+  averageRating: Float
+  openingHours: String
+}
+
+type MenuItem @table {
+  restaurant: Restaurant!
+  name: String!
+  description: String!
+  price: Float!
+  createdAt: Timestamp!
+  imageUrl: String
+  category: String
+}
+
+type FoodOrder @table {
+  customer: User!
+  restaurant: Restaurant!
+  deliveryAddress: Address!
+  totalAmount: Float!
+  status: String!
+  orderedAt: Timestamp!
+  deliveryPerson: User
+  specialInstructions: String
+  deliveryFee: Float
+  estimatedDeliveryTime: Timestamp
+  deliveredAt: Timestamp
+  customerRating: Int
+  deliveryPersonRating: Int
+  paymentStatus: String
+}
