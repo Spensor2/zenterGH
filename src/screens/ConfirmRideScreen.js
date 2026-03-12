@@ -23,7 +23,7 @@ const NEARBY_CARS = [
   { id: "c5", lat: 4.899, lng: -1.780, heading: 90 },
 ];
 
-export default function ConfirmOrderScreen({ navigation, route }) {
+export default function ConfirmRideScreen({ navigation, route }) {
   const { pickup, destination, ride, payment } = route.params;
   const { startRideSearch } = useRide();
   const mapRef = useRef(null);
