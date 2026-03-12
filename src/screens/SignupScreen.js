@@ -15,25 +15,19 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
 import colors from "../constants/colors";
 import { useAuth } from "../context/AuthContext";
 
-WebBrowser.maybeCompleteAuthSession();
-
 const SignupScreen = ({ navigation }) => {
-  const { signup, googleAuth, isAuthenticating } = useAuth();
+  const { signup, isAuthenticating } = useAuth();
 
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [focusedInput, setFocusedInput] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
+    androidClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
+    iosClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
+    webClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
+    scopes: ["profile", "email"],
+});
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const headerTranslateY = useRef(new Animated.Value(-20)).current;
@@ -41,77 +35,6 @@ const SignupScreen = ({ navigation }) => {
   const formTranslateY = useRef(new Animated.Value(30)).current;
   const bottomOpacity = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  /*
-   * ⚠️  REPLACE these with your real Google OAuth Client IDs
-   *     Get them from: https://console.cloud.google.com/apis/credentials
-   */
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: "YOUR_EXPO_CLIENT_ID.apps.googleusercontent.com",
-    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
-    iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-    webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
-    scopes: ["profile", "email"],
-  });
-
-  /* handle Google response */
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { authentication } = response;
-      handleGoogleToken(authentication.accessToken);
-    } else if (response?.type === "error") {
-      Alert.alert("Google Sign-In Failed", "Something went wrong. Try again.");
-      setGoogleLoading(false);
-    }
-  }, [response]);
-
-  const handleGoogleToken = async (accessToken) => {
-    try {
-      setGoogleLoading(true);
-
-      /* fetch Google profile */
-      const userInfoResponse = await fetch(
-        "https://www.googleapis.com/userinfo/v2/me",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const googleUser = await userInfoResponse.json();
-
-      if (!googleUser.email) {
-        Alert.alert("Error", "Could not get your Google account info.");
-        setGoogleLoading(false);
-        return;
-      }
-
-      /* send to our backend */
-      const result = await googleAuth({
-        googleId: googleUser.id,
-        email: googleUser.email,
-        fullName: googleUser.name,
-        profilePicture: googleUser.picture,
-      });
-
-      if (result.success) {
-        navigation.replace("MainTabs");
-      } else {
-        Alert.alert("Sign-In Failed", result.message, [{ text: "OK" }]);
-      }
-    } catch (error) {
-      console.log("Google auth error:", error);
-      Alert.alert("Error", "Google sign-in failed. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setGoogleLoading(true);
-      await promptAsync();
-    } catch (error) {
-      console.log("Google prompt error:", error);
-      setGoogleLoading(false);
-    }
-  };
 
   useEffect(() => {
     Animated.stagger(150, [
@@ -162,16 +85,21 @@ const SignupScreen = ({ navigation }) => {
   };
 
   const handleSignup = async () => {
-    if (!validate()) { shakeForm(); return; }
+    if (!validate()) {
+      shakeForm();
+      return;
+    }
 
     const fullPhone = `+233${phone.trim().replace(/^0+/, "")}`;
+    console.log('Calling signup with:', fullName.trim(), email.trim(), fullPhone, password);
     const result = await signup(fullName.trim(), email.trim(), fullPhone, password);
+    console.log('Signup result:', result);
 
     if (result.success) {
       navigation.replace("MainTabs");
     } else {
       shakeForm();
-      Alert.alert("Signup Failed", result.message || "Unknown error", [{ text: "OK" }]);
+      Alert.alert("Signup Failed", result.message || 'Unknown error', [{ text: "OK" }]);
     }
   };
 
@@ -213,7 +141,7 @@ const SignupScreen = ({ navigation }) => {
           autoCapitalize={keyboardType === "email-address" ? "none" : "words"}
           onFocus={() => setFocusedInput(fieldName)}
           onBlur={() => setFocusedInput(null)}
-          editable={!isAuthenticating && !googleLoading}
+          editable={!isAuthenticating}
         />
         {rightElement}
       </View>
@@ -259,15 +187,44 @@ const SignupScreen = ({ navigation }) => {
             },
           ]}
         >
-          <InputField icon="person-outline" placeholder="Full Name" value={fullName} onChangeText={setFullName} fieldName="fullName" />
-          <InputField icon="mail-outline" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" fieldName="email" />
-          <InputField icon="call-outline" placeholder="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" fieldName="phone" prefix="+233" />
           <InputField
-            icon="lock-closed-outline" placeholder="Password" value={password}
-            onChangeText={setPassword} secureTextEntry={!showPassword} fieldName="password"
+            icon="person-outline"
+            placeholder="Full Name"
+            value={fullName}
+            onChangeText={setFullName}
+            fieldName="fullName"
+          />
+          <InputField
+            icon="mail-outline"
+            placeholder="Email address"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            fieldName="email"
+          />
+          <InputField
+            icon="call-outline"
+            placeholder="Phone number"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            fieldName="phone"
+            prefix="+233"
+          />
+          <InputField
+            icon="lock-closed-outline"
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            fieldName="password"
             rightElement={
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={colors.gray500} />
+                <Ionicons
+                  name={showPassword ? "eye-outline" : "eye-off-outline"}
+                  size={20}
+                  color={colors.gray500}
+                />
               </TouchableOpacity>
             }
           />
@@ -290,10 +247,10 @@ const SignupScreen = ({ navigation }) => {
 
           {/* Signup Button */}
           <TouchableOpacity
-            style={[styles.signupButton, (!acceptTerms || isAuthenticating || googleLoading) && styles.buttonDisabled]}
+            style={[styles.signupButton, (!acceptTerms || isAuthenticating) && styles.buttonDisabled]}
             onPress={handleSignup}
             activeOpacity={0.85}
-            disabled={!acceptTerms || isAuthenticating || googleLoading}
+            disabled={!acceptTerms || isAuthenticating}
           >
             <LinearGradient
               colors={acceptTerms ? [colors.primary, colors.primaryDark] : [colors.gray400, colors.gray500]}
@@ -313,33 +270,23 @@ const SignupScreen = ({ navigation }) => {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Bottom — Google is functional, others are visual only */}
         <Animated.View style={[styles.bottomSection, { opacity: bottomOpacity }]}>
           <View style={styles.dividerContainer}>
             <View style={styles.divider} />
             <Text style={styles.dividerText}>or sign up with</Text>
             <View style={styles.divider} />
           </View>
-
           <View style={styles.socialButtons}>
-            {/* ✅ GOOGLE — FUNCTIONAL */}
-            <TouchableOpacity
-              style={[styles.googleButton, googleLoading && { opacity: 0.6 }]}
-              activeOpacity={0.8}
-              onPress={handleGoogleSignIn}
-              disabled={googleLoading || isAuthenticating || !request}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color="#DB4437" size="small" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="google" size={22} color="#DB4437" />
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
-                </>
-              )}
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+              <MaterialCommunityIcons name="google" size={22} color="#DB4437" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+              <Ionicons name="logo-apple" size={22} color={colors.black} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+              <Ionicons name="logo-facebook" size={22} color="#4267B2" />
             </TouchableOpacity>
           </View>
-
           <View style={styles.loginLink}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -385,7 +332,9 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, color: colors.text, fontWeight: "500" },
   eyeButton: { padding: 4 },
   errorText: { color: "#e53935", fontSize: 12, fontWeight: "600", marginBottom: 8, marginLeft: 4 },
-  termsRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 8, marginTop: 8 },
+  termsRow: {
+    flexDirection: "row", alignItems: "flex-start", marginBottom: 8, marginTop: 8,
+  },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.gray400,
     alignItems: "center", justifyContent: "center", marginRight: 12, marginTop: 1,
@@ -409,15 +358,12 @@ const styles = StyleSheet.create({
   dividerContainer: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
   divider: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { marginHorizontal: 16, fontSize: 13, color: colors.textLight, fontWeight: "500" },
-  socialButtons: { marginBottom: 28 },
-  googleButton: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 16, borderRadius: 14, borderWidth: 1.5,
-    borderColor: colors.border, backgroundColor: colors.white, gap: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+  socialButtons: { flexDirection: "row", justifyContent: "center", gap: 16, marginBottom: 28 },
+  socialButton: {
+    width: 56, height: 56, borderRadius: 16, borderWidth: 1.5,
+    borderColor: colors.border, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.white,
   },
-  googleButtonText: { fontSize: 16, fontWeight: "600", color: colors.text },
   loginLink: { flexDirection: "row", justifyContent: "center" },
   loginText: { fontSize: 15, color: colors.textSecondary },
   loginAction: { fontSize: 15, fontWeight: "700", color: colors.primary },

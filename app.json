@@ -2,38 +2,45 @@
   "expo": {
     "name": "zenterGh",
     "slug": "zenterGh",
-    "scheme": "zentergh",
+    "scheme": "com.zentergh.app",
     "sdkVersion": "54.0.0",
-    "experiments": {
-      "typedRoutes": true,
-      "nodeModules": [
-        "expo-dev-client"
-      ]
-    },
+
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+
+    "icon": "./assets/icon.png",
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
+
+    "experiments": {
+      "typedRoutes": true,
+      "nodeModules": ["expo-dev-client"]
     },
+
     "android": {
+      "package": "com.zentergh.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "package": "com.tid_spensor.zenterGh"
+      }
     },
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zentergh.app"
+    },
+
     "web": {
       "favicon": "./assets/favicon.png"
     },
+
     "plugins": [
       "expo-web-browser"
     ]

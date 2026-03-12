@@ -1,5 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { authAPI, tokenHelpers } from "../services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "../../services/api";
+
+const authAPI = {
+  login: (email, password) => fetch(`${BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  }).then(r => r.json().then(data => ({ ok: r.ok, data }))),
+
+  signup: (fullName, email, phone, password) => fetch(`${BASE_URL}/api/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fullName, email, phone, password }),
+  }).then(r => r.json().then(data => ({ ok: r.ok, data }))),
+
+  getMe: () => {
+    const token = AsyncStorage.getItem("authToken");
+    return token ? fetch(`${BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json().then(data => ({ ok: r.ok, data }))) : Promise.resolve({ ok: false, data: {} });
+  }
+};
+
+const tokenHelpers = {
+  saveToken: (token) => AsyncStorage.setItem("authToken", token),
+  getToken: () => AsyncStorage.getItem("authToken"),
+  clearAll: () => AsyncStorage.multiRemove(["authToken", "userData"]),
+  saveUser: (user) => AsyncStorage.setItem("userData", JSON.stringify(user)),
+  getUser: () => AsyncStorage.getItem("userData").then(data => data ? JSON.parse(data) : null),
+};
 
 const AuthContext = createContext(null);
 
