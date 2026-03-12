@@ -7,8 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  *     For local testing on Android emulator use: "http://10.0.2.2:8080"
  *     For local testing on iOS simulator use:    "http://localhost:8080"
  */
-const BASE_URL = "https://YOUR-RAILWAY-URL.up.railway.app";
-
+const BASE_URL = "https://zenter-backend-production.up.railway.app";
 const API_TIMEOUT = 15000;
 
 // ── Helper: make requests ──

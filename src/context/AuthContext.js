@@ -1,69 +1,84 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// src/context/AuthContext.js
+import React, { createContext, useState, useEffect } from 'react';
+import { authAPI, tokenHelpers } from '../../services/api';
 
-// Simple in-memory storage for development
-const memoryStorage = {
-  user: null,
-};
-
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Simple login function (no AsyncStorage needed for now)
-  const login = async (userData) => {
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await tokenHelpers.getToken();
+        if (token) {
+          const response = await authAPI.getMe();
+          if (response.ok) {
+            setUser(response.data);
+          } else {
+            await tokenHelpers.clearAll();
+          }
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const signup = async (fullName, email, phone, password) => {
+    setError(null);
     try {
-      memoryStorage.user = userData;
-      setUser(userData);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Error logging in:', error);
+      const response = await authAPI.signup(fullName, email, phone, password);
+      if (response.ok) {
+        await tokenHelpers.saveToken(response.data.token);
+        await tokenHelpers.saveUser(response.data.user);
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        setError(response.data.error);
+        return { success: false, error: response.data.error };
+      }
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const login = async (email, password) => {
+    setError(null);
+    try {
+      const response = await authAPI.login(email, password);
+      if (response.ok) {
+        await tokenHelpers.saveToken(response.data.token);
+        await tokenHelpers.saveUser(response.data.user);
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        setError(response.data.error);
+        return { success: false, error: response.data.error };
+      }
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
     }
   };
 
   const logout = async () => {
-    try {
-      memoryStorage.user = null;
-      setUser(null);
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
-  const updateUser = async (userData) => {
-    try {
-      memoryStorage.user = userData;
-      setUser(userData);
-    } catch (error) {
-      console.error('Error updating user:', error);
-    }
+    await tokenHelpers.clearAll();
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        isAuthenticated,
-        login,
-        logout,
-        updateUser,
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, error, signup, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };
 
 export default AuthContext;
