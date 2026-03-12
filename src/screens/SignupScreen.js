@@ -21,13 +21,14 @@ import { useAuth } from "../context/AuthContext";
 const SignupScreen = ({ navigation }) => {
   const { signup, isAuthenticating } = useAuth();
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
-    androidClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
-    iosClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
-    webClientId: "994750841544-8s8n1cj8ejilq1fkl8uj5btlu26kl2e9.apps.googleusercontent.com",
-    scopes: ["profile", "email"],
-});
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const headerTranslateY = useRef(new Animated.Value(-20)).current;
@@ -39,24 +40,14 @@ const SignupScreen = ({ navigation }) => {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(headerOpacity, {
-          toValue: 1, duration: 500, useNativeDriver: true,
-        }),
-        Animated.timing(headerTranslateY, {
-          toValue: 0, duration: 500, useNativeDriver: true,
-        }),
+        Animated.timing(headerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(headerTranslateY, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(formOpacity, {
-          toValue: 1, duration: 500, useNativeDriver: true,
-        }),
-        Animated.timing(formTranslateY, {
-          toValue: 0, duration: 500, useNativeDriver: true,
-        }),
+        Animated.timing(formOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(formTranslateY, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
-      Animated.timing(bottomOpacity, {
-        toValue: 1, duration: 400, useNativeDriver: true,
-      }),
+      Animated.timing(bottomOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -85,22 +76,25 @@ const SignupScreen = ({ navigation }) => {
   };
 
   const handleSignup = async () => {
-    if (!validate()) {
-      shakeForm();
-      return;
-    }
+    if (!validate()) { shakeForm(); return; }
 
     const fullPhone = `+233${phone.trim().replace(/^0+/, "")}`;
-    console.log('Calling signup with:', fullName.trim(), email.trim(), fullPhone, password);
-    const result = await signup(fullName.trim(), email.trim(), fullPhone, password);
-    console.log('Signup result:', result);
+    const result = await signup(fullName.trim(), email.trim().toLowerCase(), fullPhone, password);
 
     if (result.success) {
       navigation.replace("MainTabs");
     } else {
       shakeForm();
-      Alert.alert("Signup Failed", result.message || 'Unknown error', [{ text: "OK" }]);
+      Alert.alert("Signup Failed", result.message || "Unknown error", [{ text: "OK" }]);
     }
+  };
+
+  const handleGoogleComingSoon = () => {
+    Alert.alert(
+      "Coming Soon",
+      "Google Sign-In will be available in the next update. Please use email and password for now.",
+      [{ text: "OK" }]
+    );
   };
 
   const clearError = (field) => setErrors((e) => ({ ...e, [field]: null }));
@@ -118,13 +112,10 @@ const SignupScreen = ({ navigation }) => {
         ]}
       >
         <Ionicons
-          name={icon}
-          size={20}
+          name={icon} size={20}
           color={
-            errors[fieldName]
-              ? "#e53935"
-              : focusedInput === fieldName
-              ? colors.primary
+            errors[fieldName] ? "#e53935"
+              : focusedInput === fieldName ? colors.primary
               : colors.gray500
           }
           style={styles.inputIcon}
@@ -145,9 +136,7 @@ const SignupScreen = ({ navigation }) => {
         />
         {rightElement}
       </View>
-      {errors[fieldName] && (
-        <Text style={styles.errorText}>{errors[fieldName]}</Text>
-      )}
+      {errors[fieldName] && <Text style={styles.errorText}>{errors[fieldName]}</Text>}
     </>
   );
 
@@ -187,49 +176,19 @@ const SignupScreen = ({ navigation }) => {
             },
           ]}
         >
+          <InputField icon="person-outline" placeholder="Full Name" value={fullName} onChangeText={setFullName} fieldName="fullName" />
+          <InputField icon="mail-outline" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" fieldName="email" />
+          <InputField icon="call-outline" placeholder="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" fieldName="phone" prefix="+233" />
           <InputField
-            icon="person-outline"
-            placeholder="Full Name"
-            value={fullName}
-            onChangeText={setFullName}
-            fieldName="fullName"
-          />
-          <InputField
-            icon="mail-outline"
-            placeholder="Email address"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            fieldName="email"
-          />
-          <InputField
-            icon="call-outline"
-            placeholder="Phone number"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            fieldName="phone"
-            prefix="+233"
-          />
-          <InputField
-            icon="lock-closed-outline"
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            fieldName="password"
+            icon="lock-closed-outline" placeholder="Password" value={password}
+            onChangeText={setPassword} secureTextEntry={!showPassword} fieldName="password"
             rightElement={
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Ionicons
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={20}
-                  color={colors.gray500}
-                />
+                <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={colors.gray500} />
               </TouchableOpacity>
             }
           />
 
-          {/* Terms */}
           <TouchableOpacity
             style={styles.termsRow}
             onPress={() => { setAcceptTerms(!acceptTerms); clearError("terms"); }}
@@ -245,7 +204,6 @@ const SignupScreen = ({ navigation }) => {
           </TouchableOpacity>
           {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
 
-          {/* Signup Button */}
           <TouchableOpacity
             style={[styles.signupButton, (!acceptTerms || isAuthenticating) && styles.buttonDisabled]}
             onPress={handleSignup}
@@ -254,8 +212,7 @@ const SignupScreen = ({ navigation }) => {
           >
             <LinearGradient
               colors={acceptTerms ? [colors.primary, colors.primaryDark] : [colors.gray400, colors.gray500]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.signupButtonGradient}
             >
               {isAuthenticating ? (
@@ -276,17 +233,20 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.dividerText}>or sign up with</Text>
             <View style={styles.divider} />
           </View>
-          <View style={styles.socialButtons}>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="google" size={22} color="#DB4437" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={22} color={colors.black} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <Ionicons name="logo-facebook" size={22} color="#4267B2" />
-            </TouchableOpacity>
-          </View>
+
+          {/* Google — Coming Soon */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            activeOpacity={0.8}
+            onPress={handleGoogleComingSoon}
+          >
+            <MaterialCommunityIcons name="google" size={22} color="#DB4437" />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+            <View style={styles.comingSoonBadge}>
+              <Text style={styles.comingSoonText}>Soon</Text>
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.loginLink}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -332,9 +292,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, color: colors.text, fontWeight: "500" },
   eyeButton: { padding: 4 },
   errorText: { color: "#e53935", fontSize: 12, fontWeight: "600", marginBottom: 8, marginLeft: 4 },
-  termsRow: {
-    flexDirection: "row", alignItems: "flex-start", marginBottom: 8, marginTop: 8,
-  },
+  termsRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 8, marginTop: 8 },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.gray400,
     alignItems: "center", justifyContent: "center", marginRight: 12, marginTop: 1,
@@ -358,12 +316,20 @@ const styles = StyleSheet.create({
   dividerContainer: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
   divider: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { marginHorizontal: 16, fontSize: 13, color: colors.textLight, fontWeight: "500" },
-  socialButtons: { flexDirection: "row", justifyContent: "center", gap: 16, marginBottom: 28 },
-  socialButton: {
-    width: 56, height: 56, borderRadius: 16, borderWidth: 1.5,
-    borderColor: colors.border, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.white,
+  googleButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingVertical: 16, borderRadius: 14, borderWidth: 1.5,
+    borderColor: colors.border, backgroundColor: colors.white, gap: 12,
+    marginBottom: 28,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
+  googleButtonText: { fontSize: 16, fontWeight: "600", color: colors.text },
+  comingSoonBadge: {
+    backgroundColor: "#FFF3E0", paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 8,
+  },
+  comingSoonText: { fontSize: 11, fontWeight: "700", color: "#E65100" },
   loginLink: { flexDirection: "row", justifyContent: "center" },
   loginText: { fontSize: 15, color: colors.textSecondary },
   loginAction: { fontSize: 15, fontWeight: "700", color: colors.primary },
