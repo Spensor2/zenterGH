@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = useCallback(async (fullName, email, phone, password) => {
     setIsAuthenticating(true);
-
+  
     try {
       const response = await authAPI.signup(
         fullName,
@@ -113,29 +113,31 @@ export const AuthProvider = ({ children }) => {
         phone,
         password
       );
-
+  
+      console.log("SIGNUP RESPONSE", response);
+  
       if (response.ok && response.data.success) {
         const newToken = response.data.token;
-
+  
+        // save token only
         await tokenHelpers.saveToken(newToken);
-
-        // get user after signup
-        const me = await authAPI.getMe();
-
-        if (me.ok && me.data.success) {
-          await tokenHelpers.saveUser(me.data.user);
-          setUser(me.data.user);
-          setToken(newToken);
-          return { success: true };
-        }
-
-        return { success: false, message: "User fetch failed" };
+  
+        setToken(newToken);
+  
+        // DO NOT call /me here
+        // user will be loaded later
+  
+        return { success: true };
       }
-
-      return { success: false, message: "Signup failed" };
-
+  
+      return {
+        success: false,
+        message: response.data?.message || "Signup failed",
+      };
+  
     } catch (e) {
-      return { success: false, message: "Error" };
+      console.log("SIGNUP ERROR", e);
+      return { success: false, message: "Network error" };
     } finally {
       setIsAuthenticating(false);
     }

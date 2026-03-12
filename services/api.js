@@ -1,5 +1,4 @@
-const BASE_URL = "https://zenter-backend-production.up.railway.app";
-
+export const BASE_URL = "https://zenter-backend-production.up.railway.app";
 export const signup = async (data) => {
   const res = await fetch(`${BASE_URL}/api/auth/signup`, {
     method: "POST",
