@@ -16,19 +16,24 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
 import colors from "../constants/colors";
 import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
+WebBrowser.maybeCompleteAuthSession();
+
 const LoginScreen = ({ navigation }) => {
-  const { login, isAuthenticating } = useAuth();
+  const { login, googleAuth, isAuthenticating } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
   const [errors, setErrors] = useState({});
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const headerTranslateY = useRef(new Animated.Value(-30)).current;
@@ -38,31 +43,84 @@ const LoginScreen = ({ navigation }) => {
   const socialTranslateY = useRef(new Animated.Value(30)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
+  /*
+   * ⚠️  REPLACE with your real Google OAuth Client IDs
+   */
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: "YOUR_EXPO_CLIENT_ID.apps.googleusercontent.com",
+    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+    iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+    webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+    scopes: ["profile", "email"],
+  });
+
+  /* handle Google response */
+  useEffect(() => {
+    if (response?.type === "success") {
+      handleGoogleToken(response.authentication.accessToken);
+    } else if (response?.type === "error") {
+      Alert.alert("Google Sign-In Failed", "Something went wrong. Try again.");
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleToken = async (accessToken) => {
+    try {
+      setGoogleLoading(true);
+
+      const userInfoResponse = await fetch(
+        "https://www.googleapis.com/userinfo/v2/me",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const googleUser = await userInfoResponse.json();
+
+      if (!googleUser.email) {
+        Alert.alert("Error", "Could not get your Google account info.");
+        setGoogleLoading(false);
+        return;
+      }
+
+      const result = await googleAuth({
+        googleId: googleUser.id,
+        email: googleUser.email,
+        fullName: googleUser.name,
+        profilePicture: googleUser.picture,
+      });
+
+      if (result.success) {
+        navigation.replace("MainTabs");
+      } else {
+        Alert.alert("Sign-In Failed", result.message, [{ text: "OK" }]);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Google sign-in failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      await promptAsync();
+    } catch (error) {
+      setGoogleLoading(false);
+    }
+  };
+
   useEffect(() => {
     Animated.stagger(200, [
       Animated.parallel([
-        Animated.timing(headerOpacity, {
-          toValue: 1, duration: 600, useNativeDriver: true,
-        }),
-        Animated.timing(headerTranslateY, {
-          toValue: 0, duration: 600, useNativeDriver: true,
-        }),
+        Animated.timing(headerOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(headerTranslateY, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(formOpacity, {
-          toValue: 1, duration: 600, useNativeDriver: true,
-        }),
-        Animated.timing(formTranslateY, {
-          toValue: 0, duration: 600, useNativeDriver: true,
-        }),
+        Animated.timing(formOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(formTranslateY, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(socialOpacity, {
-          toValue: 1, duration: 600, useNativeDriver: true,
-        }),
-        Animated.timing(socialTranslateY, {
-          toValue: 0, duration: 600, useNativeDriver: true,
-        }),
+        Animated.timing(socialOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(socialTranslateY, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
     ]).start();
   }, []);
@@ -78,31 +136,18 @@ const LoginScreen = ({ navigation }) => {
 
   const validate = () => {
     const newErrors = {};
-
-    if (!email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "Enter a valid email";
-    }
-
-    if (!password) {
-      newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
+    if (!email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Enter a valid email";
+    if (!password) newErrors.password = "Password is required";
+    else if (password.length < 6) newErrors.password = "Password must be at least 6 characters";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async () => {
-    if (!validate()) {
-      shakeForm();
-      return;
-    }
+    if (!validate()) { shakeForm(); return; }
 
     const result = await login(email.trim(), password);
-
     if (result.success) {
       navigation.replace("MainTabs");
     } else {
@@ -160,22 +205,19 @@ const LoginScreen = ({ navigation }) => {
             ]}
           >
             <Ionicons
-              name="mail-outline"
-              size={20}
+              name="mail-outline" size={20}
               color={errors.email ? "#e53935" : focusedInput === "email" ? colors.primary : colors.gray500}
               style={styles.inputIcon}
             />
             <TextInput
-              style={styles.input}
-              placeholder="Email address"
+              style={styles.input} placeholder="Email address"
               placeholderTextColor={colors.placeholder}
               value={email}
               onChangeText={(t) => { setEmail(t); setErrors((e) => ({ ...e, email: null })); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
+              keyboardType="email-address" autoCapitalize="none"
               onFocus={() => setFocusedInput("email")}
               onBlur={() => setFocusedInput(null)}
-              editable={!isAuthenticating}
+              editable={!isAuthenticating && !googleLoading}
             />
           </View>
           {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
@@ -189,48 +231,39 @@ const LoginScreen = ({ navigation }) => {
             ]}
           >
             <Ionicons
-              name="lock-closed-outline"
-              size={20}
+              name="lock-closed-outline" size={20}
               color={errors.password ? "#e53935" : focusedInput === "password" ? colors.primary : colors.gray500}
               style={styles.inputIcon}
             />
             <TextInput
-              style={styles.input}
-              placeholder="Password"
+              style={styles.input} placeholder="Password"
               placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={(t) => { setPassword(t); setErrors((e) => ({ ...e, password: null })); }}
               secureTextEntry={!showPassword}
               onFocus={() => setFocusedInput("password")}
               onBlur={() => setFocusedInput(null)}
-              editable={!isAuthenticating}
+              editable={!isAuthenticating && !googleLoading}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-              <Ionicons
-                name={showPassword ? "eye-outline" : "eye-off-outline"}
-                size={20}
-                color={colors.gray500}
-              />
+              <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={colors.gray500} />
             </TouchableOpacity>
           </View>
           {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-          {/* Forgot */}
           <TouchableOpacity style={styles.forgotButton}>
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 
           {/* Login Button */}
           <TouchableOpacity
-            style={[styles.loginButton, isAuthenticating && { opacity: 0.7 }]}
-            onPress={handleLogin}
-            activeOpacity={0.85}
-            disabled={isAuthenticating}
+            style={[styles.loginButton, (isAuthenticating || googleLoading) && { opacity: 0.7 }]}
+            onPress={handleLogin} activeOpacity={0.85}
+            disabled={isAuthenticating || googleLoading}
           >
             <LinearGradient
               colors={[colors.primary, colors.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.loginButtonGradient}
             >
               {isAuthenticating ? (
@@ -245,7 +278,7 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Social */}
+        {/* Social — Only Google is functional */}
         <Animated.View
           style={[
             styles.socialSection,
@@ -257,16 +290,24 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.dividerText}>or continue with</Text>
             <View style={styles.divider} />
           </View>
-          <View style={styles.socialButtons}>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="google" size={24} color="#DB4437" />
-              <Text style={styles.socialButtonText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={24} color={colors.black} />
-              <Text style={styles.socialButtonText}>Apple</Text>
-            </TouchableOpacity>
-          </View>
+
+          {/* ✅ Google Button — FUNCTIONAL */}
+          <TouchableOpacity
+            style={[styles.googleButton, googleLoading && { opacity: 0.6 }]}
+            activeOpacity={0.8}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading || isAuthenticating || !request}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#DB4437" size="small" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="google" size={24} color="#DB4437" />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
           <View style={styles.signupLink}>
             <Text style={styles.signupText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
@@ -326,13 +367,15 @@ const styles = StyleSheet.create({
   dividerContainer: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
   divider: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { marginHorizontal: 16, fontSize: 13, color: colors.textLight, fontWeight: "500" },
-  socialButtons: { flexDirection: "row", gap: 14, marginBottom: 32 },
-  socialButton: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 14, borderRadius: 14, borderWidth: 1.5,
-    borderColor: colors.border, backgroundColor: colors.white, gap: 10,
+  googleButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingVertical: 16, borderRadius: 14, borderWidth: 1.5,
+    borderColor: colors.border, backgroundColor: colors.white, gap: 12,
+    marginBottom: 32,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  socialButtonText: { fontSize: 15, fontWeight: "600", color: colors.text },
+  googleButtonText: { fontSize: 16, fontWeight: "600", color: colors.text },
   signupLink: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   signupText: { fontSize: 15, color: colors.textSecondary },
   signupAction: { fontSize: 15, fontWeight: "700", color: colors.primary },
